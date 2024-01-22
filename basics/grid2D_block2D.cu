@@ -1,17 +1,10 @@
-/*********************************************************************************************
- * file name  : grid2D_block1D.cu
- * author     : 权 双
- * date       : 2023-08-14
- * brief      : 组织线程模型：二维网格一维线程块计算二维矩阵加法
-***********************************************************************************************/
-
 #include <stdio.h>
 #include "../tools/common.cuh"
 
 __global__ void addMatrix(int *A, int *B, int *C, const int nx, const int ny)
 {
     int ix = threadIdx.x + blockIdx.x * blockDim.x;
-    int iy = blockIdx.y;
+    int iy = threadIdx.y + blockIdx.y * blockDim.y;;
     unsigned int idx = iy * nx + ix;
     if (ix < nx && iy < ny)
     {
@@ -72,8 +65,8 @@ int main(void)
     }
 
     // calculate on GPU
-    dim3 block(4, 1);
-    dim3 grid((nx + block.x -1) / block.x, ny);
+    dim3 block(4, 4);
+    dim3 grid((nx + block.x -1) / block.x, (ny + block.y - 1) / block.y);
     printf("Thread config:grid:<%d, %d>, block:<%d, %d>\n", grid.x, grid.y, block.x, block.y);
     
     addMatrix<<<grid, block>>>(ipDevice_A, ipDevice_B, ipDevice_C, nx, ny);  // 调用内核函数
