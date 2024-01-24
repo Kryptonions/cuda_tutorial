@@ -4,7 +4,9 @@
 //using namespace std
 using namespace std;
 
-TILE_WIDTH = 16
+const int TILE_WIDTH = 16; // 必须加const
+//extern __shared__ float sharedA[][];
+//extern __shared__ float sharedB[][];
 
 struct Matrix
 {
@@ -26,18 +28,18 @@ __device__ void setElement(Matrix *A, int row, int col, float value)
 }
 
 // 矩阵相乘kernel，2-D，每个线程计算一个元素
-__global__ void tiledMatMulKernel(Matrix *A, Matrix *B, Matrix *C, )
+__global__ void tiledMatMulKernel(Matrix *A, Matrix *B, Matrix *C)
 {   
-    // block内共享内存
-    __shared__ float sharedA[TILE_WIDTH][TILE_WIDTH];
+    // block内共享内存，矩阵维度必须是常量，否则编译报错
+    __shared__ float sharedA[TILE_WIDTH][TILE_WIDTH];  
     __shared__ float sharedB[TILE_WIDTH][TILE_WIDTH];
-	float Cvalue = 0.0;
+	  float Cvalue = 0.0;
     int tx = threadIdx.x;
     int ty = threadIdx.y;
     int bx = blockIdx.x;
     int by = blockIdx.y;
-	int row = ty + by * blockDim.y;  //线程计算的元素所在的行，(row, col)表示计算元素的矩阵索引
-	int col = tx + bx * blockDim.x;  //线程计算的元素所在的列，(row, col)表示计算元素的矩阵索引
+	  int row = ty + by * blockDim.y;  //线程计算的元素所在的行，(row, col)表示计算元素的矩阵索引
+	  int col = tx + bx * blockDim.x;  //线程计算的元素所在的列，(row, col)表示计算元素的矩阵索引
     int m = A->height;                //A的行数
     int n = A->width;                 //A的列数
     int k = B->width;                 //B的列数
@@ -62,7 +64,7 @@ __global__ void tiledMatMulKernel(Matrix *A, Matrix *B, Matrix *C, )
         // 等待block内所有线程计算得到
         __syncthreads();
     }
-	if (row < m && col < k) {
+	  if (row < m && col < k) {
         setElement(C, row, col, Cvalue);
     }
 }
