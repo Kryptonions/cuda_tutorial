@@ -1,7 +1,6 @@
 #include <iostream>
 #include "../tools/common.cuh"
 
-//using namespace std
 using namespace std;
 
 const int TILE_WIDTH = 16; // 必须加const
@@ -38,8 +37,8 @@ __global__ void tiledMatMulKernel(Matrix *A, Matrix *B, Matrix *C)
     int ty = threadIdx.y;
     int bx = blockIdx.x;
     int by = blockIdx.y;
-	  int row = ty + by * blockDim.y;  //线程计算的元素所在的行，(row, col)表示计算元素的矩阵索引
-	  int col = tx + bx * blockDim.x;  //线程计算的元素所在的列，(row, col)表示计算元素的矩阵索引
+	int row = ty + by * blockDim.y;  //线程计算的元素所在的行，(row, col)表示计算元素的矩阵索引
+	int col = tx + bx * blockDim.x;  //线程计算的元素所在的列，(row, col)表示计算元素的矩阵索引
     int m = A->height;                //A的行数
     int n = A->width;                 //A的列数
     int k = B->width;                 //B的列数
@@ -109,7 +108,6 @@ int main(void)
         (height + blockSize.y - 1) / blockSize.y);
     // 执行kernel
     tiledMatMulKernel <<< gridSize, blockSize >>>(A, B, C);
-
 
     // 同步device 保证结果能正确访问
     cudaDeviceSynchronize();
