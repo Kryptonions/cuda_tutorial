@@ -103,7 +103,7 @@ int main() {
     // 每个block需要写O_TILE_WIDTH个数据
     dim3 gridSize((width + O_TILE_WIDTH - 1) / O_TILE_WIDTH, 1);
     // 执行kernel
-    size_t SHMEM = (BLOCK_WIDTH + RADIUS * 2) * sizeof(int);
+    size_t SHMEM = BLOCK_WIDTH * sizeof(int);
     tiled1DConvKernel<<<gridSize, blockSize, SHMEM>>>(d_array, d_result, width);
 
     // 将执行结果copy到主机
