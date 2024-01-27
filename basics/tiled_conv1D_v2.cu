@@ -1,8 +1,3 @@
-// This program implements a 1D convolution using CUDA,
-// and stores the mask in constant memory, and loads
-// reused values into shared memory (scratchpad)
-// By: Nick from CoffeeBeforeArch
-
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
