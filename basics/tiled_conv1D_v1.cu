@@ -14,7 +14,7 @@
 __constant__ int M[MASK_WIDTH];
 
 
-__global__ void tiled1DConvKernelV2(int *N, int *P, int width) {
+__global__ void tiled1DConvKernel(int *N, int *P, int width) {
     // 共享内存
     //__shared__ int Ns[BLOCK_WIDTH];  
     extern __shared__ int Ns[];
@@ -104,7 +104,7 @@ int main() {
     dim3 gridSize((width + O_TILE_WIDTH - 1) / O_TILE_WIDTH, 1);
     // 执行kernel
     size_t SHMEM = (BLOCK_WIDTH + RADIUS * 2) * sizeof(int);
-    tiled1DConvKernelV2<<<gridSize, blockSize, SHMEM>>>(d_array, d_result, width);
+    tiled1DConvKernel<<<gridSize, blockSize, SHMEM>>>(d_array, d_result, width);
 
     // 将执行结果copy到主机
     ErrorCheck(cudaMemcpy(h_result, d_result, nBytes, cudaMemcpyDeviceToHost), __FILE__, __LINE__);
