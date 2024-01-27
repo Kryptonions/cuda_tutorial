@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
+#include "../tools/common.cuh"
 
 #define MASK_LENGTH 7
 

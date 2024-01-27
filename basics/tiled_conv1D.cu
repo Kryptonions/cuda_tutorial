@@ -1,10 +1,12 @@
 #include <iostream>
+#include <cassert>
+#include <cstdlib>
 #include "../tools/common.cuh"
 
 #define MASK_WIDTH 5
 #define RADIUS MASK_WIDTH / 2
 // 每个tile需要写的数量
-#define O_TILE_WIDTH 1020   // 每个tile需要写的数量
+#define O_TILE_WIDTH 10 
 // 每个tile需要读的数量，需要额外读取更多数据，所以block内的线程数多于每个block需要写的量，一部分线程只负责读数据
 #define BLOCK_WIDTH (O_TILE_WIDTH + MASK_WIDTH - 1) 
 
@@ -31,13 +33,39 @@ __global__ void tiled1DConvKernel(int *N, int *P, int width) {
     __syncthreads();
     //只有前O_TILE_WIDTH个线程负责写数据，其余空闲
     if (tx < O_TILE_WIDTH) {
-        for (j = 0; j < MASK_WIDTH; j++) {
+        output = 0;
+        for (int j = 0; j < MASK_WIDTH; j++) {
             output += M[j] * Ns[j + tx];
         }
-    }
-    //边界检查
-    if (index_o < width) {
         P[index_o] = output;
+    }
+}
+
+void verify_result(int *array, int *result, int *mask, int n) {
+    // pad array with 0s
+    int r = MASK_WIDTH / 2;
+    int n_p = n + r * 2;
+    int *h_array = new int[n_p];
+    for (int i = 0; i < n_p; i++) {
+        if ((i < r) || (i >= (n + r))) {
+            h_array[i] = 0;
+        } else {
+            h_array[i] = array[i - r];
+        }
+    }
+    int temp;
+    for (int i = 0; i < n; i++) {
+        temp = 0;
+        for (int j = 0; j < MASK_WIDTH; j++) {
+            temp += h_array[i + j] * mask[j];
+        }
+        //if (i < 20) {
+        //  printf("temp=%d, result=%d\n", temp, result[i]);
+        //}
+        //if (temp != result[i]) {
+        //printf("i=%d, temp=%d, result=%d\n", i, temp, result[i]);
+        //}
+        assert(temp == result[i]);
     }
 }
 
@@ -45,7 +73,7 @@ int main(void) {
     setGPU();
 
     // 数组长度
-    int width = 1 << 10;
+    int width = 1 << 20;
 
     int *A, *P;
     int nBytes = width * sizeof(int);
@@ -57,13 +85,13 @@ int main(void) {
 
     // 初始化数据
     for (int i = 0; i < width; i++) {
-        A[i] = 1;
+        A[i] = rand() % 100;
     }
 
     // 初始化mask
     int *h_mask = new int[MASK_WIDTH];
     for (int i = 0; i < MASK_WIDTH; i++) {
-        h_mask[i] = 1;
+        h_mask[i] = rand() % 10;
     }
     // 将数据copy到常量内存
     cudaMemcpyToSymbol(M, h_mask, mBytes);
@@ -74,12 +102,16 @@ int main(void) {
     dim3 gridSize((width + O_TILE_WIDTH - 1) / O_TILE_WIDTH, 1);
     // 执行kernel
     tiled1DConvKernel <<< gridSize, blockSize >>>(A, P, width);
-    // 同步device 保证结果能正确访问
-    cudaDeviceSynchronize();
-
-    for (int i = 0; i < 10; i++) {
-        printf("id=%d, P=%d", i, P[i]);
+    // 等待所有线程执行完毕
+    //cudaDeviceSynchronize();
+    // 检查结果
+    /**
+    for (int i = 0; i < width; i++) {
+        printf("id=%d, P=%d\n", i, P[i]);
     }
+    **/
+    verify_result(A, P, h_mask, width);
+    std::cout << "COMPLETED SUCCESSFULLY\n";
 
     return 0;
 }
