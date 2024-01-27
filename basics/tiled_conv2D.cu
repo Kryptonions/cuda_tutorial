@@ -6,7 +6,7 @@
 #define MASK_DIM 5
 #define RADIUS MASK_DIM / 2
 // 每个tile需要写的数量
-#define O_TILE_WIDTH 256
+#define O_TILE_WIDTH 16
 // 每个tile需要读的数量，需要额外读取更多数据，所以block内的线程数多于每个block需要写的量，一部分线程只负责读数据
 #define BLOCK_WIDTH (O_TILE_WIDTH + MASK_DIM - 1) 
 
@@ -16,34 +16,35 @@ __constant__ int M[MASK_DIM * MASK_DIM];
 
 __global__ void tiled2DConvKernel(int *d_array, int *d_result, int width) {
     // 共享内存
-    //__shared__ int Ns[BLOCK_WIDTH];  
-    extern __shared__ int shmem[][];
-    // 当前线程负责写的位置
+    extern __shared__ int shmem[BLOCK_WIDTH][BLOCK_WIDTH];
+    //__shared__ int shmem[BLOCK_WIDTH][BLOCK_WIDTH];
     int tx = threadIdx.x;
     int ty = threadIdx.y;
+    // 当前线程负责写的位置
     int row_o = blockIdx.y * O_TILE_WIDTH + threadIdx.y;
     int col_o = blockIdx.x * O_TILE_WIDTH + threadIdx.x;
     // 当前线程负责读的位置
     int row_i = row_o - RADIUS;
     int col_i = col_o - RADIUS;
 
-    if ((row_i >= 0) && (row_i < height) && (col_i >= 0) && (col_i < width)) {
+    if ((row_i >= 0) && (row_i < width) && (col_i >= 0) && (col_i < width)) {
         shmem[ty][tx] = d_array[row_i * width + col_i];
     } else {
         shmem[ty][tx] = 0;
     }
+    // 等待所有线程读完数据
     __syncthreads();
     int output = 0;
+    // 只有一部分线程会写
     if ((ty < O_TILE_WIDTH) && (tx < O_TILE_WIDTH)) {
         for (int i = 0; i < MASK_DIM; i++) {
             for (int j = 0; j < MASK_DIM; j++) {
-                output += M[i][j] * shmem[i + ty][j + tx];
+                output += M[i * MASK_DIM + j] * shmem[i + ty][j + tx];
             }
         }
-    }
-
-    if (row_o < height && col_o < width) {
-        d_result[row_o * width + col_o] = output
+        if (row_o < width && col_o < width) {
+            d_result[row_o * width + col_o] = output;
+        }
     }
 }
 
@@ -106,15 +107,15 @@ int main() {
     // host2device
     cudaMemcpy(d_matrix, matrix, bytes_n, cudaMemcpyHostToDevice);
     // mask到常量内存
-    cudaMemcpyToSymbol(mask, h_mask, bytes_m);
+    cudaMemcpyToSymbol(M, h_mask, bytes_m);
 
 
     dim3 block_dim(BLOCK_WIDTH, BLOCK_WIDTH);
     // 每个block需要写O_TILE_WIDTH * O_TILE_WIDTH个数据
-    dim3 grid_dim((N + O_TILE_WIDTH - 1) / O_TILE_WIDTH, N + O_TILE_WIDTH - 1) / O_TILE_WIDTH);
+    dim3 grid_dim((N + O_TILE_WIDTH - 1) / O_TILE_WIDTH, (N + O_TILE_WIDTH - 1) / O_TILE_WIDTH);
 
     size_t SHMEM = BLOCK_WIDTH * BLOCK_WIDTH * sizeof(int);
-    tiled2DConvKernel<<<grid_dim, block_dim>>>(d_matrix, d_result, N);
+    tiled2DConvKernel<<<grid_dim, block_dim, SHMEM>>>(d_matrix, d_result, N);
 
     cudaMemcpy(result, d_result, bytes_n, cudaMemcpyDeviceToHost);
 
