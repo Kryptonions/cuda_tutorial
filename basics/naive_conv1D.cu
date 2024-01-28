@@ -12,7 +12,7 @@
       n       = number of elements in array
       m       = number of elements in the mask
 */
-__global__ void 1DConvKernel(int *array, int *mask, int *result, int n, int m) {
+__global__ void naive1DConvKernel(int *array, int *mask, int *result, int n, int m) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int r = m / 2;
 
@@ -72,7 +72,7 @@ int main() {
     int THREADS = 256;
     int GRID = (n + THREADS - 1) / THREADS;
 
-    1DConvKernel<<<GRID, THREADS>>>(d_array, d_mask, d_result, n, m);
+    naive1DConvKernel<<<GRID, THREADS>>>(d_array, d_mask, d_result, n, m);
 
     cudaMemcpy(h_result.data(), d_result, bytes_n, cudaMemcpyDeviceToHost);
 
