@@ -17,7 +17,7 @@ struct Matrix
 // 获取矩阵A的(row, col)元素
 __device__ float getElement(Matrix *A, int row, int col)
 {
-	return A->elements[row * A->width + col];
+    return A->elements[row * A->width + col];
 }
 
 // 为矩阵A的(row, col)元素赋值
@@ -32,7 +32,7 @@ __global__ void tiledMatMulKernel(Matrix *A, Matrix *B, Matrix *C)
     // block内共享内存，矩阵维度必须是常量，否则编译报错
     __shared__ float sharedA[TILE_WIDTH][TILE_WIDTH];  
     __shared__ float sharedB[TILE_WIDTH][TILE_WIDTH];
-	  float Cvalue = 0.0;
+	float Cvalue = 0.0;
     int tx = threadIdx.x;
     int ty = threadIdx.y;
     int bx = blockIdx.x;
