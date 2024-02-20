@@ -36,30 +36,24 @@ __global__ void regTilledMatMulKernel(Matrix *A, Matrix *B, Matrix *C)
     float c[V][V] = {0};
     float a[V], b[V];
 
-	float Cvalue = 0.0;
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
-    int bx = blockIdx.x;
-    int by = blockIdx.y;
+	  int row = threadIdx.y + blockIdx.y * blockDim.y;
+	  int col = threadIdx.x + blockIdx.x * blockDim.x;
 
-	int row = threadIdx.y + blockIdx.y * blockDim.y;
-	int col = threadIdx.x + blockIdx.x * blockDim.x;
-
-    int m = A->height;                //A的行数
+    //int m = A->height;                //A的行数
     int n = A->width;                 //A的列数
-    int k = B->width;                 //B的列数
+    //int k = B->width;                 //B的列数
     for (int i = 0; i < n; i++) {
         // global memory to register
         for (int j = 0; j < V; j++) {
             a[j] = getElement(A, row * V + j, i);
         }
-        for (int j = 0; j < V; j++>) {
+        for (int j = 0; j < V; j++) {
             b[j] = getElement(B, i, col * V + j);
         }
         // 两个向量做乘法
         for (int j = 0; j < V; j++) {
             for (int k = 0; k < V; k++) {
-                c[j][k] = a[j] * b[k];
+                c[j][k] += a[j] * b[k];
             }
         }
     }
@@ -111,6 +105,8 @@ int main(void)
     dim3 gridSize((width + blockSize.x * V - 1) / (blockSize.x * V),
         (height + blockSize.y * V - 1) / (blockSize.y * V));
     // 执行kernel
+    cout << (width + blockSize.x * V - 1) / (blockSize.x * V) << endl;
+    cout << (height + blockSize.y * V - 1) / (blockSize.y * V) << endl;
     regTilledMatMulKernel <<< gridSize, blockSize >>>(A, B, C);
 
     // 同步device 保证结果能正确访问
