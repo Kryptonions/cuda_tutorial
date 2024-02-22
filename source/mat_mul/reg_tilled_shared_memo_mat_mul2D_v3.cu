@@ -41,6 +41,12 @@ __global__ void regTilledSharedMemoryMatMulKernelV3(Matrix *A, Matrix *B, Matrix
     int K = A->width;                   // A的列数
     int N = B->width;                   // B的列数
 
+    const int bx = blockIdx.x;
+    const int by = blockIdx.y;
+    const int tx = threadIdx.x;
+    const int ty = threadIdx.y;
+    const int tid = ty * blockDim.x + tx;
+
     __shared__ float s_a[2][BK][BM];
     __shared__ float s_b[2][BK][BN];
 
@@ -75,19 +81,21 @@ __global__ void regTilledSharedMemoryMatMulKernelV3(Matrix *A, Matrix *B, Matrix
         s_a[0][load_a_smem_k + 3][load_a_smem_m] = r_load_a[3];
         FLOAT4(s_b[0][load_b_smem_k][load_b_smem_n]) = FLOAT4(r_load_b[0]);
     }
+    __syncthreads();
+
 		// 循环次数从1开始
     for (int bk = 1; bk < (K + BK - 1) / BK; bk++) {
 
         int smem_sel = (bk - 1) & 1;
         int smem_sel_next = bk & 1;
-		// 访问i+1
+		    // 访问i+1
         int load_a_gmem_k = bk * BK + load_a_smem_k;
         int load_a_gmem_addr = OFFSET(load_a_gmem_m, load_a_gmem_k, K);
         int load_b_gmem_k = bk * BK + load_b_smem_k;
         int load_b_gmem_addr = OFFSET(load_b_gmem_k, load_b_gmem_n, N);
         FLOAT4(r_load_a[0]) = FLOAT4(A->elements[load_a_gmem_addr]);
         FLOAT4(r_load_b[0]) = FLOAT4(B->elements[load_b_gmem_addr]);
-	    // 计算i
+	      // 计算i
         #pragma unroll
         for (int tk = 0; tk < BK; tk++) {
             FLOAT4(r_comp_a[0]) = FLOAT4(s_a[smem_sel][tk][ty * TM / 2         ]);
@@ -134,16 +142,16 @@ __global__ void regTilledSharedMemoryMatMulKernelV3(Matrix *A, Matrix *B, Matrix
         int store_c_gmem_m = by * BM + ty * TM / 2 + i;
         int store_c_gmem_n = bx * BN + tx * TN / 2;
         int store_c_gmem_addr = OFFSET(store_c_gmem_m, store_c_gmem_n, N);
-        FLOAT4(C-elements[store_c_gmem_addr]) = FLOAT4(r_c[i][0]);
-        FLOAT4(C-elements[store_c_gmem_addr + BN / 2]) = FLOAT4(r_c[i][4]);
+        FLOAT4(C->elements[store_c_gmem_addr]) = FLOAT4(r_c[i][0]);
+        FLOAT4(C->elements[store_c_gmem_addr + BN / 2]) = FLOAT4(r_c[i][4]);
     }
     #pragma unroll
     for (int i = 0; i < TM / 2; i++) {
         int store_c_gmem_m = by * BM + BM / 2 + ty * TM / 2 + i;
         int store_c_gmem_n = bx * BN + tx * TN / 2;
         int store_c_gmem_addr = OFFSET(store_c_gmem_m, store_c_gmem_n, N);
-        FLOAT4(C-elements[store_c_gmem_addr]) = FLOAT4(r_c[i + TM / 2][0]);
-        FLOAT4(C-elements[store_c_gmem_addr + BN / 2]) = FLOAT4(r_c[i + TM / 2][4]);
+        FLOAT4(C->elements[store_c_gmem_addr]) = FLOAT4(r_c[i + TM / 2][0]);
+        FLOAT4(C->elements[store_c_gmem_addr + BN / 2]) = FLOAT4(r_c[i + TM / 2][4]);
     }
 }
 
