@@ -36,14 +36,10 @@ __device__ void setElement(Matrix *A, int row, int col, float value)
 	A->elements[row * A->width + col] = value;
 }
 
-
-__global__ void regTilledSharedMemoryMatMulKernel(Matrix *A, Matrix *B, Matrix *C) {
-    int K = A->width;                   //A的列数
-
-
-}
-__global__ void regTilledSharedMemoryMatMulKernel(Matrix *A, Matrix *B, Matrix *C, const int M, const int N, const int K) {
-    int K = A->width;                   //A的列数
+__global__ void regTilledSharedMemoryMatMulKernelV2(Matrix *A, Matrix *B, Matrix *C) {
+    int M = A->height;                  // A的行数
+    int K = A->width;                   // A的列数
+    int N = B->width;                   // B的列数
 
     const int bx = blockIdx.x;
     const int by = blockIdx.y;
@@ -98,7 +94,7 @@ __global__ void regTilledSharedMemoryMatMulKernel(Matrix *A, Matrix *B, Matrix *
         for (int j = 0; j < TN; j += 4) {
             int store_c_gmem_n = bx * BN + tx * TN + j;
             int store_c_gmem_addr = OFFSET(store_c_gmem_m, store_c_gmem_n, N);
-            FLOAT4(c->elements[store_c_gmem_addr]) = FLOAT4(r_c[i][j]);
+            FLOAT4(C->elements[store_c_gmem_addr]) = FLOAT4(r_c[i][j]);
         }
     }
 }
@@ -140,12 +136,12 @@ int main(void)
     // 定义kernel的执行配置
     dim3 blockSize(THREAD_NUM, THREAD_NUM);
     // 每个线程负责V*V个值的计算
-    dim3 gridSize((width + blockSize.x * V - 1) / (blockSize.x * V),
-        (height + blockSize.y * V - 1) / (blockSize.y * V));
+    dim3 gridSize((width + blockSize.x * TN - 1) / (blockSize.x * TN),
+        (height + blockSize.y * TM - 1) / (blockSize.y * TM));
     // 执行kernel
-    cout << (width + blockSize.x * V - 1) / (blockSize.x * V) << endl;
-    cout << (height + blockSize.y * V - 1) / (blockSize.y * V) << endl;
-    regTilledSharedMemoryMatMulKernel <<< gridSize, blockSize >>>(A, B, C);
+    cout << (width + blockSize.x * TN - 1) / (blockSize.x * TN) << endl;
+    cout << (height + blockSize.y * TM - 1) / (blockSize.y * TM) << endl;
+    regTilledSharedMemoryMatMulKernelV2 <<< gridSize, blockSize >>>(A, B, C);
 
     // 同步device 保证结果能正确访问
     cudaDeviceSynchronize();
