@@ -1,9 +1,11 @@
 #include <iostream>
 #include "../tools/common.cuh"
+#include <cuda_profiler_api.h>
+
 
 using namespace std;
 
-#define V 8  // 每个thread负责计算的元素数量V*V
+#define V 4  // 每个thread负责计算的元素数量V*V
 #define TILE_WIDTH 16
 #define S TILE_WIDTH*V
 #define L TILE_WIDTH*V
@@ -47,17 +49,22 @@ __global__ void regTilledSharedMemoryMatMulKernel(Matrix *A, Matrix *B, Matrix *
     int n = A->width;                   //A的列数
     //int k = B->width;                 //B的列数
     for (int i = 0; i < n; i += S) {
+        //__syncthreads();
         // global memory to shared memory
+
         int aBaseRow = row * V;
-        int aBaseCol = i * S + tx * V;
-        int bBaseRow = i * S + ty * V;
+        int aBaseCol = i + tx * V;
+        int bBaseRow = i + ty * V;
         int bBaseCol = col * V;
         for (int j = 0; j < V; j++) {
             for (int k = 0; k < V; k++) {
+                //float x = getElement(A, aBaseRow + j, aBaseCol + k);
+                //float y = getElement(B, bBaseRow + j, bBaseCol + k);
                 sharedA[ty * V + j][tx * V + k] = getElement(A, aBaseRow + j, aBaseCol + k);
                 sharedB[ty * V + j][tx * V + k] = getElement(B, bBaseRow + j, bBaseCol + k);
             }
         }
+
         __syncthreads();
         for (int j = 0; j < S; j++) {
             // shared memory to register
@@ -73,6 +80,8 @@ __global__ void regTilledSharedMemoryMatMulKernel(Matrix *A, Matrix *B, Matrix *
                 }
             }
         }
+        //__syncthreads();
+
     }
     // copy back
     for (int j = 0; j < V; j++) {
@@ -133,6 +142,10 @@ int main(void)
     for (int i = 0; i < width * height; ++i)
         maxError = fmax(maxError, fabs(C->elements[i] - 2 * width));
     cout << "最大误差: " << maxError << endl;
+
+    cudaError_t err = cudaGetLastError();  // add
+    if (err != cudaSuccess) std::cout << "CUDA error: " << cudaGetErrorString(err) << std::endl; // add
+    cudaProfilerStop();
 
     return 0;
 }
